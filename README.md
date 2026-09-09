@@ -68,4 +68,4 @@ The browser will ask for permission to access the folder again at the start of e
 - No offline support: an internet connection is required.
 
 ## Licence
-GNU GPL v3.0 - LICENCE.md
+GNU GPL v3.0 - [LICENCE.md](https://github.com/toninodigiacomo/passerelle/blob/316d072f3c527e1a7c5377629cd70bd960efb542/LICENSE.md)
