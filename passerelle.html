@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Passerelle</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+    --bg: #10141A;
+    --surface: #171C24;
+    --surface-raised: #1E2530;
+    --border: #2A323E;
+    --text: #E9E7DF;
+    --text-dim: #98A0AC;
+    --claude: #D6A94B;
+    --gemini: #4FA8A0;
+    --mistral: #E8792F;
+    --openai: #7C9CF0;
+    --danger: #D9695C;
+    --font-display: 'Space Grotesk', sans-serif;
+    --font-body: 'Inter', sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; background: var(--bg); color: var(--text); font-family: var(--font-body); }
+
+.banner { position: fixed; top: 0; left: 0; right: 0; height: 60px; background: var(--surface); border-bottom: 1px solid var(--border); z-index: 100; }
+.banner-inner { max-width: 760px; height: 100%; margin: 0 auto; padding: 0 20px; display: flex; align-items: center; justify-content: space-between; }
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand-mark { width: 14px; height: 14px; border-radius: 50%; background: conic-gradient(var(--gemini) 0 25%, var(--mistral) 25% 50%, var(--openai) 50% 75%, var(--claude) 75% 100%); }
+.brand-name { font-family: var(--font-display); font-weight: 600; font-size: 1.15rem; letter-spacing: 0.01em; }
+.incognito-pill { font-family: var(--font-display); font-size: 0.7rem; font-weight: 600; color: var(--text-dim); background: var(--surface-raised); border: 1px solid var(--border); padding: 3px 9px; border-radius: 999px; margin-left: 10px; display: none; }
+.incognito-pill.active { display: inline-block; }
+
+.banner-actions { display: flex; align-items: center; gap: 4px; }
+.icon-btn { background: transparent; border: none; color: var(--text-dim); padding: 8px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.15s ease, color 0.15s ease; }
+.icon-btn:hover { background: var(--surface-raised); color: var(--text); }
+
+.chat-wrap { max-width: 760px; margin: 0 auto; padding: 60px 20px 100px; min-height: 100vh; display: flex; flex-direction: column; }
+.chat-log { flex: 1; padding-top: 32px; display: flex; flex-direction: column; gap: 18px; }
+.empty-state { margin-top: 18vh; text-align: center; }
+.empty-title { font-family: var(--font-display); font-size: 1.4rem; font-weight: 600; margin: 0 0 8px; }
+.empty-sub { color: var(--text-dim); font-size: 0.95rem; max-width: 440px; margin: 0 auto; line-height: 1.5; }
+
+.msg { max-width: 82%; display: flex; flex-direction: column; gap: 6px; }
+.msg.user { align-self: flex-end; align-items: flex-end; }
+.msg.ai { align-self: flex-start; align-items: flex-start; }
+.msg-source { font-family: var(--font-display); font-size: 0.75rem; color: var(--text-dim); display: flex; align-items: center; gap: 6px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+.dot-claude { background: var(--claude); }
+.dot-gemini { background: var(--gemini); }
+.dot-mistral { background: var(--mistral); }
+.dot-openai { background: var(--openai); }
+.bubble { padding: 12px 16px; border-radius: 14px; line-height: 1.55; font-size: 0.98rem; white-space: pre-wrap; }
+.msg.user .bubble { background: var(--surface-raised); border: 1px solid var(--border); border-bottom-right-radius: 4px; }
+.msg.ai .bubble { background: var(--surface); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
+.msg.error .bubble { border-color: var(--danger); color: #F0C6C0; }
+.msg.pending .bubble { color: var(--text-dim); }
+
+.chat-form { position: fixed; bottom: 0; left: 0; right: 0; background: linear-gradient(to top, var(--bg) 60%, transparent); padding: 24px 20px 20px; }
+#chat-form { display: flex; align-items: flex-end; gap: 10px; max-width: 760px; margin: 0 auto; }
+#chat-input { flex: 1; resize: none; background: var(--surface-raised); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; color: var(--text); font-family: var(--font-body); font-size: 0.98rem; max-height: 160px; }
+#chat-input:focus { outline: none; border-color: var(--claude); }
+.send-btn { width: 42px; height: 42px; border-radius: 10px; background: var(--claude); border: none; color: #14181F; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; transition: filter 0.15s ease; }
+.send-btn:hover { filter: brightness(1.08); }
+.send-btn:disabled { opacity: 0.5; cursor: default; }
+
+.overlay { position: fixed; inset: 0; background: rgba(8, 10, 13, 0.6); display: flex; justify-content: flex-end; z-index: 200; }
+.overlay.hidden { display: none; }
+.panel { width: 400px; max-width: 92vw; height: 100%; background: var(--surface); border-left: 1px solid var(--border); display: flex; flex-direction: column; }
+.panel-header { display: flex; align-items: center; justify-content: space-between; padding: 18px 20px; border-bottom: 1px solid var(--border); }
+.panel-header h2 { font-family: var(--font-display); font-size: 1.1rem; margin: 0; }
+.panel-body { padding: 20px; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 26px; }
+.field-group { display: flex; flex-direction: column; gap: 12px; }
+.group-label { font-family: var(--font-display); font-size: 0.85rem; font-weight: 600; display: flex; align-items: center; gap: 8px; color: var(--text-dim); }
+.field { display: flex; flex-direction: column; gap: 6px; font-size: 0.85rem; color: var(--text-dim); }
+.field input { background: var(--surface-raised); border: 1px solid var(--border); border-radius: 8px; padding: 9px 11px; color: var(--text); font-family: var(--font-body); font-size: 0.92rem; }
+.field input:focus { outline: none; border-color: var(--claude); }
+
+.toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 0.92rem; cursor: pointer; }
+.toggle-row input { display: none; }
+.toggle-track { width: 40px; height: 22px; border-radius: 999px; background: var(--border); position: relative; flex-shrink: 0; transition: background 0.15s ease; }
+.toggle-thumb { position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: var(--text-dim); transition: transform 0.15s ease, background 0.15s ease; }
+.toggle-row input:checked + .toggle-track { background: rgba(79, 168, 160, 0.35); }
+.toggle-row input:checked + .toggle-track .toggle-thumb { transform: translateX(18px); background: var(--gemini); }
+
+.note { font-size: 0.78rem; color: var(--text-dim); line-height: 1.5; margin: 0; }
+
+.order-list { display: flex; flex-direction: column; gap: 8px; }
+.order-row { display: flex; align-items: center; gap: 10px; background: var(--surface-raised); border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; }
+.order-row.disabled { opacity: 0.5; }
+.order-rank { font-family: var(--font-display); font-size: 0.8rem; color: var(--text-dim); width: 16px; text-align: center; flex-shrink: 0; }
+.order-name { display: flex; align-items: center; gap: 8px; flex: 1; font-size: 0.92rem; }
+.badge { font-size: 0.68rem; font-family: var(--font-display); font-weight: 600; padding: 2px 7px; border-radius: 999px; }
+.badge-free { background: rgba(79, 168, 160, 0.18); color: var(--gemini); }
+.badge-paid { background: rgba(217, 105, 92, 0.16); color: var(--danger); }
+.order-controls { display: flex; align-items: center; gap: 2px; }
+.mini-btn { background: transparent; border: none; color: var(--text-dim); cursor: pointer; padding: 4px; border-radius: 6px; display: flex; }
+.mini-btn:hover { background: var(--border); color: var(--text); }
+.mini-btn:disabled { opacity: 0.25; cursor: default; }
+.mini-toggle { width: 30px; height: 18px; border-radius: 999px; background: var(--border); position: relative; cursor: pointer; flex-shrink: 0; margin-left: 4px; }
+.mini-toggle input { display: none; }
+.mini-toggle .thumb { position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--text-dim); transition: transform 0.15s ease, background 0.15s ease; }
+.mini-toggle input:checked ~ .thumb { transform: translateX(12px); background: var(--gemini); }
+.mini-toggle input:checked ~ .track-fill { background: rgba(79, 168, 160, 0.35); }
+
+.folder-box { background: var(--surface-raised); border: 1px solid var(--border); border-radius: 8px; padding: 9px 11px; font-size: 0.88rem; color: var(--text); overflow-wrap: anywhere; }
+.folder-box code { font-size: 0.85rem; }
+
+.io-row { display: flex; gap: 10px; }
+.io-btn { flex: 1; padding: 9px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface-raised); color: var(--text); font-family: var(--font-body); font-size: 0.85rem; cursor: pointer; }
+.io-btn:hover { border-color: var(--claude); }
+.io-btn.danger:hover { border-color: var(--danger); color: #F0C6C0; }
+
+.save-feedback { font-size: 0.85rem; color: var(--gemini); min-height: 1em; margin: 0; }
+.panel-footer { padding: 16px 20px; border-top: 1px solid var(--border); }
+.primary-btn { width: 100%; padding: 11px; border-radius: 10px; border: none; background: var(--claude); color: #14181F; font-family: var(--font-display); font-weight: 600; font-size: 0.95rem; cursor: pointer; transition: filter 0.15s ease; }
+.primary-btn:hover { filter: brightness(1.08); }
+</style>
+</head>
+<body>
+
+<header class="banner">
+    <div class="banner-inner">
+        <div class="brand">
+            <span class="brand-mark"></span>
+            <span class="brand-name">Passerelle</span>
+            <span id="incognito-pill" class="incognito-pill">Incognito</span>
+        </div>
+        <div class="banner-actions">
+            <button id="clear-btn" class="icon-btn" aria-label="Nouvelle conversation" title="Nouvelle conversation">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M4 12a8 8 0 1 1 2.34 5.66" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                    <path d="M4 17v-5h5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </button>
+            <button id="settings-btn" class="icon-btn" aria-label="Ouvrir les réglages" title="Réglages">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" stroke="currentColor" stroke-width="1.6"/>
+                    <path d="M19.4 13.5a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V19.6a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H4.4a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H10.5a1.65 1.65 0 0 0 1-1.51V4.4a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.09c.24.7.82 1.23 1.51 1.4h.09a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </button>
+        </div>
+    </div>
+</header>
+
+<main class="chat-wrap">
+    <div id="chat-log" class="chat-log">
+        <div class="empty-state">
+            <p class="empty-title">Posez une question.</p>
+            <p class="empty-sub">Les fournisseurs sont interrogés dans l'ordre défini dans les réglages — gratuits en premier, Claude en dernier recours. Chaque échange est sauvegardé dans le dossier configuré, incognito ou non ; l'incognito contrôle seulement l'affichage au démarrage.</p>
+        </div>
+    </div>
+
+    <form id="chat-form">
+        <textarea id="chat-input" rows="1" placeholder="Écrivez votre message..." autofocus></textarea>
+        <button type="submit" id="send-btn" class="send-btn" aria-label="Envoyer">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M4 12h15M13 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </button>
+    </form>
+</main>
+
+<div id="settings-overlay" class="overlay hidden">
+    <div class="panel" role="dialog" aria-labelledby="settings-title">
+        <div class="panel-header">
+            <h2 id="settings-title">Réglages</h2>
+            <button id="close-settings" class="icon-btn" aria-label="Fermer">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                </svg>
+            </button>
+        </div>
+
+        <div class="panel-body">
+            <section class="field-group">
+                <div class="group-label">Confidentialité</div>
+                <label class="toggle-row">
+                    <span>Mode incognito (ne rien conserver)</span>
+                    <input type="checkbox" id="incognito_enabled">
+                    <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                </label>
+                <p class="note">Contrôle uniquement l'affichage : désactivé, la conversation est aussi rechargée au démarrage depuis ce navigateur. Dans tous les cas — incognito ou non — chaque échange est enregistré dans le dossier de sauvegarde ci-dessous, pour pouvoir le retrouver plus tard.</p>
+                <div class="io-row">
+                    <button type="button" id="clear-history-btn" class="io-btn danger">Effacer l'historique affiché</button>
+                </div>
+            </section>
+
+            <section class="field-group">
+                <div class="group-label">Dossier de sauvegarde</div>
+                <div class="folder-box">
+                    <span id="folder-name-display">Aucun dossier configuré</span>
+                </div>
+                <div class="io-row">
+                    <button type="button" id="browse-btn" class="io-btn">Parcourir…</button>
+                </div>
+                <p id="folder-status" class="note"></p>
+                <p class="note">Un dossier est créé par jour (<code>2026-09-09/</code>), et un fichier par conversation à l'intérieur (<code>conversation-14h32-a1b2.jsonl</code>). Une nouvelle conversation démarre à l'ouverture de la page ou via "Nouvelle conversation". Le chemin complet n'est pas affiché — seul le nom du dossier apparaît — c'est une restriction de sécurité du navigateur, pas un bug. Fonctionne avec Chrome ou Edge ; le navigateur redemandera l'autorisation d'accès à chaque nouvelle session, c'est normal.</p>
+            </section>
+
+            <section class="field-group">
+                <div class="group-label">Ordre de priorité</div>
+                <p class="note">Le premier fournisseur activé et configuré répond. En cas d'échec, on passe au suivant.</p>
+                <div id="order-list" class="order-list"></div>
+            </section>
+
+            <section class="field-group">
+                <div class="group-label"><span class="dot dot-gemini"></span> Gemini <span class="badge badge-free">Gratuit</span></div>
+                <label class="field"><span>Clé API</span><input type="password" id="gemini_api_key" placeholder="AIza..."></label>
+                <label class="field"><span>Modèle</span><input type="text" id="gemini_model" placeholder="gemini-1.5-flash"></label>
+            </section>
+
+            <section class="field-group">
+                <div class="group-label"><span class="dot dot-mistral"></span> Mistral <span class="badge badge-free">Gratuit*</span></div>
+                <label class="field"><span>Clé API</span><input type="password" id="mistral_api_key" placeholder="..."></label>
+                <label class="field"><span>Modèle</span><input type="text" id="mistral_model" placeholder="mistral-small-latest"></label>
+                <p class="note">*Tier gratuit avec limites de débit, sous réserve des conditions actuelles de Mistral.</p>
+            </section>
+
+            <section class="field-group">
+                <div class="group-label"><span class="dot dot-openai"></span> ChatGPT (OpenAI) <span class="badge badge-paid">Payant</span></div>
+                <label class="field"><span>Clé API</span><input type="password" id="openai_api_key" placeholder="sk-..."></label>
+                <label class="field"><span>Modèle</span><input type="text" id="openai_model" placeholder="gpt-4o-mini"></label>
+            </section>
+
+            <section class="field-group">
+                <div class="group-label"><span class="dot dot-claude"></span> Claude <span class="badge badge-paid">Payant</span></div>
+                <label class="field"><span>Clé API</span><input type="password" id="claude_api_key" placeholder="sk-ant-..."></label>
+                <label class="field"><span>Modèle</span><input type="text" id="claude_model" placeholder="claude-sonnet-4-6"></label>
+                <label class="field"><span>Tokens max</span><input type="number" id="claude_max_tokens" min="1" max="8192"></label>
+            </section>
+
+            <section class="field-group">
+                <div class="group-label">Fichier de configuration</div>
+                <div class="io-row">
+                    <button type="button" id="export-btn" class="io-btn">Exporter en XML</button>
+                    <button type="button" id="import-btn" class="io-btn">Importer un XML</button>
+                </div>
+                <input type="file" id="import-file" accept=".xml" style="display:none">
+                <p class="note">La configuration est aussi conservée automatiquement dans ce navigateur (indépendamment du mode incognito, qui ne concerne que l'historique des messages).</p>
+            </section>
+
+            <p id="save-feedback" class="save-feedback"></p>
+        </div>
+
+        <div class="panel-footer">
+            <button id="save-settings" class="primary-btn">Enregistrer</button>
+        </div>
+    </div>
+</div>
+
+<script>
+const CONFIG_KEY = "passerelle_config_v2";
+const HISTORY_KEY = "passerelle_history_v2";
+
+const PROVIDER_META = {
+    gemini:  { label: "Gemini",  free: true,  dot: "dot-gemini"  },
+    mistral: { label: "Mistral", free: true,  dot: "dot-mistral" },
+    openai:  { label: "ChatGPT", free: false, dot: "dot-openai"  },
+    claude:  { label: "Claude",  free: false, dot: "dot-claude"  },
+};
+
+const DEFAULT_CONFIG = {
+    incognito: true,
+    order: ["gemini", "mistral", "openai", "claude"],
+    providers: {
+        gemini:  { enabled: true, api_key: "", model: "gemini-1.5-flash" },
+        mistral: { enabled: true, api_key: "", model: "mistral-small-latest" },
+        openai:  { enabled: true, api_key: "", model: "gpt-4o-mini" },
+        claude:  { enabled: true, api_key: "", model: "claude-sonnet-4-6", max_tokens: 1000 },
+    },
+};
+
+// ---------- Config : chargement / sauvegarde ----------
+
+function loadConfig() {
+    try {
+        const raw = localStorage.getItem(CONFIG_KEY);
+        if (!raw) return structuredClone(DEFAULT_CONFIG);
+        const parsed = JSON.parse(raw);
+        return {
+            incognito: parsed.incognito !== undefined ? parsed.incognito : DEFAULT_CONFIG.incognito,
+            order: Array.isArray(parsed.order) && parsed.order.length === 4 ? parsed.order : [...DEFAULT_CONFIG.order],
+            providers: {
+                gemini: { ...DEFAULT_CONFIG.providers.gemini, ...(parsed.providers?.gemini || {}) },
+                mistral: { ...DEFAULT_CONFIG.providers.mistral, ...(parsed.providers?.mistral || {}) },
+                openai: { ...DEFAULT_CONFIG.providers.openai, ...(parsed.providers?.openai || {}) },
+                claude: { ...DEFAULT_CONFIG.providers.claude, ...(parsed.providers?.claude || {}) },
+            },
+        };
+    } catch (e) {
+        return structuredClone(DEFAULT_CONFIG);
+    }
+}
+
+function saveConfigToStorage(cfg) {
+    localStorage.setItem(CONFIG_KEY, JSON.stringify(cfg));
+}
+
+function configToXML(cfg) {
+    const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const p = cfg.providers;
+    return `<?xml version="1.0" encoding="UTF-8"?>
+<config>
+    <incognito>${cfg.incognito ? "true" : "false"}</incognito>
+    <order>${cfg.order.join(",")}</order>
+    <providers>
+        <gemini enabled="${p.gemini.enabled}">
+            <api_key>${esc(p.gemini.api_key)}</api_key>
+            <model>${esc(p.gemini.model)}</model>
+        </gemini>
+        <mistral enabled="${p.mistral.enabled}">
+            <api_key>${esc(p.mistral.api_key)}</api_key>
+            <model>${esc(p.mistral.model)}</model>
+        </mistral>
+        <openai enabled="${p.openai.enabled}">
+            <api_key>${esc(p.openai.api_key)}</api_key>
+            <model>${esc(p.openai.model)}</model>
+        </openai>
+        <claude enabled="${p.claude.enabled}">
+            <api_key>${esc(p.claude.api_key)}</api_key>
+            <model>${esc(p.claude.model)}</model>
+            <max_tokens>${esc(p.claude.max_tokens)}</max_tokens>
+        </claude>
+    </providers>
+</config>
+`;
+}
+
+function xmlToConfig(xmlText) {
+    const doc = new DOMParser().parseFromString(xmlText, "application/xml");
+    if (doc.querySelector("parsererror")) throw new Error("Fichier XML invalide.");
+
+    const text = (selector, fallback = "") => {
+        const el = doc.querySelector(selector);
+        return el && el.textContent ? el.textContent.trim() : fallback;
+    };
+    const enabledAttr = (selector) => {
+        const el = doc.querySelector(selector);
+        return el ? el.getAttribute("enabled") !== "false" : true;
+    };
+
+    const orderRaw = text("order", DEFAULT_CONFIG.order.join(","));
+    const order = orderRaw.split(",").map(s => s.trim()).filter(id => PROVIDER_META[id]);
+    const finalOrder = order.length === 4 ? order : [...DEFAULT_CONFIG.order];
+
+    return {
+        incognito: text("incognito", "true").toLowerCase() === "true",
+        order: finalOrder,
+        providers: {
+            gemini: {
+                enabled: enabledAttr("providers > gemini"),
+                api_key: text("providers > gemini > api_key"),
+                model: text("providers > gemini > model", DEFAULT_CONFIG.providers.gemini.model),
+            },
+            mistral: {
+                enabled: enabledAttr("providers > mistral"),
+                api_key: text("providers > mistral > api_key"),
+                model: text("providers > mistral > model", DEFAULT_CONFIG.providers.mistral.model),
+            },
+            openai: {
+                enabled: enabledAttr("providers > openai"),
+                api_key: text("providers > openai > api_key"),
+                model: text("providers > openai > model", DEFAULT_CONFIG.providers.openai.model),
+            },
+            claude: {
+                enabled: enabledAttr("providers > claude"),
+                api_key: text("providers > claude > api_key"),
+                model: text("providers > claude > model", DEFAULT_CONFIG.providers.claude.model),
+                max_tokens: parseInt(text("providers > claude > max_tokens", "1000"), 10) || 1000,
+            },
+        },
+    };
+}
+
+// ---------- Historique ----------
+
+function loadHistory() {
+    try {
+        const raw = localStorage.getItem(HISTORY_KEY);
+        return raw ? JSON.parse(raw) : [];
+    } catch (e) {
+        return [];
+    }
+}
+
+function saveHistory(history) {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+}
+
+function clearHistory() {
+    localStorage.removeItem(HISTORY_KEY);
+}
+
+let currentHistory = [];
+
+function persistTurn(userText, aiEntry) {
+    const cfg = loadConfig();
+    if (cfg.incognito) return;
+    currentHistory.push({ role: "user", text: userText });
+    currentHistory.push({ role: "ai", ...aiEntry });
+    saveHistory(currentHistory);
+}
+
+// ---------- Sauvegarde fichier (toujours active, incognito ou non) ----------
+
+const FS_SUPPORTED = "showDirectoryPicker" in window;
+const IDB_NAME = "passerelle_db";
+const IDB_STORE = "handles";
+const IDB_DIR_KEY = "save_dir";
+
+function idbOpen() {
+    return new Promise((resolve, reject) => {
+        const req = indexedDB.open(IDB_NAME, 1);
+        req.onupgradeneeded = () => req.result.createObjectStore(IDB_STORE);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+    });
+}
+
+async function idbGet(key) {
+    const db = await idbOpen();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(IDB_STORE, "readonly");
+        const req = tx.objectStore(IDB_STORE).get(key);
+        req.onsuccess = () => resolve(req.result || null);
+        req.onerror = () => reject(req.error);
+    });
+}
+
+async function idbSet(key, value) {
+    const db = await idbOpen();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(IDB_STORE, "readwrite");
+        tx.objectStore(IDB_STORE).put(value, key);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+    });
+}
+
+async function getSavedDirHandle() {
+    if (!FS_SUPPORTED) return null;
+    try { return await idbGet(IDB_DIR_KEY); } catch (e) { return null; }
+}
+
+async function ensureDirPermission(handle) {
+    if (!handle) return false;
+    const opts = { mode: "readwrite" };
+    if ((await handle.queryPermission(opts)) === "granted") return true;
+    if ((await handle.requestPermission(opts)) === "granted") return true;
+    return false;
+}
+
+async function chooseSaveDirectory() {
+    if (!FS_SUPPORTED) throw new Error("Non supporté par ce navigateur (utilisez Chrome ou Edge).");
+    const handle = await window.showDirectoryPicker({ mode: "readwrite" });
+    await idbSet(IDB_DIR_KEY, handle);
+    return handle;
+}
+
+function pad2(n) { return String(n).padStart(2, "0"); }
+
+function dayFolderName(date = new Date()) {
+    return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+}
+
+function newConversationFilename(date = new Date()) {
+    const rand = Math.random().toString(36).slice(2, 6);
+    return `conversation-${pad2(date.getHours())}h${pad2(date.getMinutes())}${pad2(date.getSeconds())}-${rand}.jsonl`;
+}
+
+let conversationFileMeta = null;
+
+function startNewConversationFile() {
+    const now = new Date();
+    conversationFileMeta = { dayFolder: dayFolderName(now), filename: newConversationFilename(now) };
+}
+
+async function appendLinesToConversationFile(rootHandle, lines) {
+    if (!conversationFileMeta) startNewConversationFile();
+    const dayHandle = await rootHandle.getDirectoryHandle(conversationFileMeta.dayFolder, { create: true });
+    const fileHandle = await dayHandle.getFileHandle(conversationFileMeta.filename, { create: true });
+    const file = await fileHandle.getFile();
+    const writable = await fileHandle.createWritable({ keepExistingData: true });
+    const text = lines.map(l => JSON.stringify(l)).join("\n") + "\n";
+    await writable.write({ type: "write", position: file.size, data: text });
+    await writable.close();
+}
+
+let saveFolderHintShown = false;
+
+function maybeShowSaveFolderHint() {
+    if (saveFolderHintShown || !FS_SUPPORTED) return;
+    saveFolderHintShown = true;
+    addMessage({
+        role: "ai",
+        text: "Astuce : aucun dossier de sauvegarde n'est configuré. Ouvrez les réglages pour en choisir un et conserver un historique de secours sur disque.",
+    });
+}
+
+async function logTurnToFile(userText, aiEntry, incognito) {
+    if (!FS_SUPPORTED) return;
+    try {
+        const handle = await getSavedDirHandle();
+        if (!handle) {
+            maybeShowSaveFolderHint();
+            return;
+        }
+        const ok = await ensureDirPermission(handle);
+        if (!ok) {
+            updateFolderStatus("error", "Autorisation d'accès au dossier refusée.");
+            return;
+        }
+        const ts = new Date().toISOString();
+        const lines = [
+            { ts, role: "user", text: userText, incognito },
+            { ts, role: "ai", text: aiEntry.text, source: aiEntry.source || null, error: !!aiEntry.isError, incognito },
+        ];
+        await appendLinesToConversationFile(handle, lines);
+        updateFolderStatus("ok", "Dernier enregistrement réussi.");
+    } catch (err) {
+        console.warn("Échec de la sauvegarde locale :", err);
+        updateFolderStatus("error", "Échec de l'enregistrement : " + err.message);
+    }
+}
+
+function updateFolderStatus(kind, text) {
+    const el = document.getElementById("folder-status");
+    if (!el) return;
+    el.textContent = text;
+    el.style.color = kind === "error" ? "var(--danger)" : "var(--gemini)";
+}
+
+// ---------- Appels aux fournisseurs ----------
+
+async function askGemini(prompt, p) {
+    if (!p.api_key) throw new Error("clé manquante");
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(p.model)}:generateContent?key=${encodeURIComponent(p.api_key)}`;
+    const res = await fetch(url, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data?.error?.message || `HTTP ${res.status}`);
+    return data?.candidates?.[0]?.content?.parts?.map(x => x.text).join("") || "(réponse vide)";
+}
+
+async function askMistral(prompt, p) {
+    if (!p.api_key) throw new Error("clé manquante");
+    const res = await fetch("https://api.mistral.ai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+            "content-type": "application/json",
+            "authorization": `Bearer ${p.api_key}`,
+        },
+        body: JSON.stringify({ model: p.model, messages: [{ role: "user", content: prompt }] }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data?.error?.message || data?.message || `HTTP ${res.status}`);
+    return data?.choices?.[0]?.message?.content || "(réponse vide)";
+}
+
+async function askOpenAI(prompt, p) {
+    if (!p.api_key) throw new Error("clé manquante");
+    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+            "content-type": "application/json",
+            "authorization": `Bearer ${p.api_key}`,
+        },
+        body: JSON.stringify({ model: p.model, messages: [{ role: "user", content: prompt }] }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data?.error?.message || `HTTP ${res.status}`);
+    return data?.choices?.[0]?.message?.content || "(réponse vide)";
+}
+
+async function askClaude(prompt, p) {
+    if (!p.api_key) throw new Error("clé manquante");
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+            "content-type": "application/json",
+            "x-api-key": p.api_key,
+            "anthropic-version": "2023-06-01",
+            "anthropic-dangerous-direct-browser-access": "true",
+        },
+        body: JSON.stringify({ model: p.model, max_tokens: p.max_tokens || 1000, messages: [{ role: "user", content: prompt }] }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data?.error?.message || `HTTP ${res.status}`);
+    return (data.content || []).filter(b => b.type === "text").map(b => b.text).join("");
+}
+
+const PROVIDER_FUNCS = { gemini: askGemini, mistral: askMistral, openai: askOpenAI, claude: askClaude };
+
+async function askWithFallback(prompt, cfg) {
+    const attempts = [];
+    for (const id of cfg.order) {
+        const p = cfg.providers[id];
+        if (!p.enabled) continue;
+        try {
+            const reply = await PROVIDER_FUNCS[id](prompt, p);
+            return { reply, source: id };
+        } catch (err) {
+            attempts.push(`${PROVIDER_META[id].label}: ${err.message}`);
+        }
+    }
+    if (attempts.length === 0) throw new Error("Aucun fournisseur activé.");
+    throw new Error("Tous les fournisseurs ont échoué — " + attempts.join(" · "));
+}
+
+// ---------- UI : chat ----------
+
+const chatLog = document.getElementById("chat-log");
+const chatForm = document.getElementById("chat-form");
+const chatInput = document.getElementById("chat-input");
+const sendBtn = document.getElementById("send-btn");
+const incognitoPill = document.getElementById("incognito-pill");
+const clearBtn = document.getElementById("clear-btn");
+
+chatInput.addEventListener("input", () => {
+    chatInput.style.height = "auto";
+    chatInput.style.height = Math.min(chatInput.scrollHeight, 160) + "px";
+});
+chatInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        chatForm.requestSubmit();
+    }
+});
+
+function removeEmptyState() {
+    const empty = chatLog.querySelector(".empty-state");
+    if (empty) empty.remove();
+}
+
+function addMessage({ role, text, source, isError, isPending }) {
+    const msg = document.createElement("div");
+    msg.className = `msg ${role}` + (isError ? " error" : "") + (isPending ? " pending" : "");
+
+    if (role === "ai" && source && PROVIDER_META[source]) {
+        const label = document.createElement("div");
+        label.className = "msg-source";
+        label.innerHTML = `<span class="dot ${PROVIDER_META[source].dot}"></span>${PROVIDER_META[source].label}`;
+        msg.appendChild(label);
+    }
+
+    const bubble = document.createElement("div");
+    bubble.className = "bubble";
+    bubble.textContent = text;
+    msg.appendChild(bubble);
+
+    chatLog.appendChild(msg);
+    chatLog.scrollTop = chatLog.scrollHeight;
+    return msg;
+}
+
+function renderIncognitoPill(cfg) {
+    incognitoPill.classList.toggle("active", cfg.incognito);
+}
+
+function resetChatUI() {
+    chatLog.innerHTML = `<div class="empty-state">
+        <p class="empty-title">Posez une question.</p>
+        <p class="empty-sub">Les fournisseurs sont interrogés dans l'ordre défini dans les réglages — gratuits en premier, Claude en dernier recours. Chaque échange est sauvegardé dans le dossier configuré, incognito ou non.</p>
+    </div>`;
+    currentHistory = [];
+}
+
+clearBtn.addEventListener("click", () => {
+    resetChatUI();
+    clearHistory();
+    startNewConversationFile();
+});
+
+chatForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const message = chatInput.value.trim();
+    if (!message) return;
+
+    removeEmptyState();
+    addMessage({ role: "user", text: message });
+    chatInput.value = "";
+    chatInput.style.height = "auto";
+    sendBtn.disabled = true;
+
+    const pending = addMessage({ role: "ai", text: "Réflexion en cours...", isPending: true });
+    const cfg = loadConfig();
+
+    try {
+        const { reply, source } = await askWithFallback(message, cfg);
+        pending.remove();
+        addMessage({ role: "ai", text: reply, source });
+        persistTurn(message, { text: reply, source });
+        logTurnToFile(message, { text: reply, source }, cfg.incognito);
+    } catch (err) {
+        pending.remove();
+        addMessage({ role: "ai", text: err.message, isError: true });
+        persistTurn(message, { text: err.message, isError: true });
+        logTurnToFile(message, { text: err.message, isError: true }, cfg.incognito);
+    } finally {
+        sendBtn.disabled = false;
+        chatInput.focus();
+    }
+});
+
+// ---------- UI : réglages ----------
+
+const settingsBtn = document.getElementById("settings-btn");
+const closeSettings = document.getElementById("close-settings");
+const settingsOverlay = document.getElementById("settings-overlay");
+const saveSettingsBtn = document.getElementById("save-settings");
+const saveFeedback = document.getElementById("save-feedback");
+const exportBtn = document.getElementById("export-btn");
+const importBtn = document.getElementById("import-btn");
+const importFile = document.getElementById("import-file");
+const clearHistoryBtn = document.getElementById("clear-history-btn");
+const orderListEl = document.getElementById("order-list");
+const browseBtn = document.getElementById("browse-btn");
+const folderNameDisplay = document.getElementById("folder-name-display");
+
+const fields = {
+    incognito_enabled: document.getElementById("incognito_enabled"),
+    gemini_api_key: document.getElementById("gemini_api_key"),
+    gemini_model: document.getElementById("gemini_model"),
+    mistral_api_key: document.getElementById("mistral_api_key"),
+    mistral_model: document.getElementById("mistral_model"),
+    openai_api_key: document.getElementById("openai_api_key"),
+    openai_model: document.getElementById("openai_model"),
+    claude_api_key: document.getElementById("claude_api_key"),
+    claude_model: document.getElementById("claude_model"),
+    claude_max_tokens: document.getElementById("claude_max_tokens"),
+};
+
+let workingOrder = [...DEFAULT_CONFIG.order];
+let workingEnabled = {};
+
+function renderOrderList() {
+    orderListEl.innerHTML = "";
+    workingOrder.forEach((id, index) => {
+        const meta = PROVIDER_META[id];
+        const row = document.createElement("div");
+        row.className = "order-row" + (workingEnabled[id] ? "" : " disabled");
+
+        row.innerHTML = `
+            <span class="order-rank">${index + 1}</span>
+            <span class="order-name">
+                <span class="dot ${meta.dot}"></span>
+                ${meta.label}
+                <span class="badge ${meta.free ? "badge-free" : "badge-paid"}">${meta.free ? "Gratuit" : "Payant"}</span>
+            </span>
+            <span class="order-controls">
+                <button type="button" class="mini-btn" data-action="up" data-id="${id}" ${index === 0 ? "disabled" : ""} aria-label="Monter">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 15l6-6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+                <button type="button" class="mini-btn" data-action="down" data-id="${id}" ${index === workingOrder.length - 1 ? "disabled" : ""} aria-label="Descendre">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+                <label class="mini-toggle">
+                    <input type="checkbox" data-id="${id}" class="enable-toggle" ${workingEnabled[id] ? "checked" : ""}>
+                    <span class="track-fill" style="position:absolute;inset:0;border-radius:999px;"></span>
+                    <span class="thumb"></span>
+                </label>
+            </span>
+        `;
+        orderListEl.appendChild(row);
+    });
+
+    orderListEl.querySelectorAll(".mini-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const id = btn.dataset.id;
+            const action = btn.dataset.action;
+            const i = workingOrder.indexOf(id);
+            const j = action === "up" ? i - 1 : i + 1;
+            if (j < 0 || j >= workingOrder.length) return;
+            [workingOrder[i], workingOrder[j]] = [workingOrder[j], workingOrder[i]];
+            renderOrderList();
+        });
+    });
+
+    orderListEl.querySelectorAll(".enable-toggle").forEach(cb => {
+        cb.addEventListener("change", () => {
+            workingEnabled[cb.dataset.id] = cb.checked;
+            renderOrderList();
+        });
+    });
+}
+
+function populateFields(cfg) {
+    fields.incognito_enabled.checked = !!cfg.incognito;
+    fields.gemini_api_key.value = cfg.providers.gemini.api_key || "";
+    fields.gemini_model.value = cfg.providers.gemini.model || "";
+    fields.mistral_api_key.value = cfg.providers.mistral.api_key || "";
+    fields.mistral_model.value = cfg.providers.mistral.model || "";
+    fields.openai_api_key.value = cfg.providers.openai.api_key || "";
+    fields.openai_model.value = cfg.providers.openai.model || "";
+    fields.claude_api_key.value = cfg.providers.claude.api_key || "";
+    fields.claude_model.value = cfg.providers.claude.model || "";
+    fields.claude_max_tokens.value = cfg.providers.claude.max_tokens || 1000;
+
+    workingOrder = [...cfg.order];
+    workingEnabled = {
+        gemini: cfg.providers.gemini.enabled,
+        mistral: cfg.providers.mistral.enabled,
+        openai: cfg.providers.openai.enabled,
+        claude: cfg.providers.claude.enabled,
+    };
+    renderOrderList();
+}
+
+function readFields() {
+    return {
+        incognito: fields.incognito_enabled.checked,
+        order: [...workingOrder],
+        providers: {
+            gemini: {
+                enabled: workingEnabled.gemini,
+                api_key: fields.gemini_api_key.value.trim(),
+                model: fields.gemini_model.value.trim() || DEFAULT_CONFIG.providers.gemini.model,
+            },
+            mistral: {
+                enabled: workingEnabled.mistral,
+                api_key: fields.mistral_api_key.value.trim(),
+                model: fields.mistral_model.value.trim() || DEFAULT_CONFIG.providers.mistral.model,
+            },
+            openai: {
+                enabled: workingEnabled.openai,
+                api_key: fields.openai_api_key.value.trim(),
+                model: fields.openai_model.value.trim() || DEFAULT_CONFIG.providers.openai.model,
+            },
+            claude: {
+                enabled: workingEnabled.claude,
+                api_key: fields.claude_api_key.value.trim(),
+                model: fields.claude_model.value.trim() || DEFAULT_CONFIG.providers.claude.model,
+                max_tokens: parseInt(fields.claude_max_tokens.value, 10) || 1000,
+            },
+        },
+    };
+}
+
+async function refreshFolderDisplay() {
+    if (!FS_SUPPORTED) {
+        folderNameDisplay.textContent = "Non supporté par ce navigateur (Chrome/Edge requis)";
+        browseBtn.disabled = true;
+        return;
+    }
+    const handle = await getSavedDirHandle();
+    folderNameDisplay.textContent = handle ? handle.name : "Aucun dossier configuré";
+}
+
+browseBtn.addEventListener("click", async () => {
+    try {
+        const handle = await chooseSaveDirectory();
+        folderNameDisplay.textContent = handle.name;
+        saveFeedback.style.color = "var(--gemini)";
+        saveFeedback.textContent = "Dossier de sauvegarde configuré.";
+    } catch (err) {
+        if (err.name !== "AbortError") {
+            saveFeedback.style.color = "var(--danger)";
+            saveFeedback.textContent = err.message;
+        }
+    }
+});
+
+function openSettings() {
+    settingsOverlay.classList.remove("hidden");
+    saveFeedback.textContent = "";
+    populateFields(loadConfig());
+    refreshFolderDisplay();
+}
+function closeSettingsPanel() {
+    settingsOverlay.classList.add("hidden");
+}
+
+settingsBtn.addEventListener("click", openSettings);
+closeSettings.addEventListener("click", closeSettingsPanel);
+settingsOverlay.addEventListener("click", (e) => { if (e.target === settingsOverlay) closeSettingsPanel(); });
+
+saveSettingsBtn.addEventListener("click", () => {
+    const cfg = readFields();
+    saveConfigToStorage(cfg);
+    renderIncognitoPill(cfg);
+    saveFeedback.style.color = "var(--gemini)";
+    saveFeedback.textContent = "Configuration enregistrée.";
+    setTimeout(closeSettingsPanel, 800);
+});
+
+clearHistoryBtn.addEventListener("click", () => {
+    clearHistory();
+    resetChatUI();
+    saveFeedback.style.color = "var(--gemini)";
+    saveFeedback.textContent = "Historique effacé.";
+});
+
+exportBtn.addEventListener("click", () => {
+    const cfg = readFields();
+    const xml = configToXML(cfg);
+    const blob = new Blob([xml], { type: "application/xml" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "config.xml";
+    a.click();
+    URL.revokeObjectURL(url);
+});
+
+importBtn.addEventListener("click", () => importFile.click());
+importFile.addEventListener("change", async () => {
+    const file = importFile.files[0];
+    if (!file) return;
+    try {
+        const text = await file.text();
+        const cfg = xmlToConfig(text);
+        saveConfigToStorage(cfg);
+        populateFields(cfg);
+        renderIncognitoPill(cfg);
+        saveFeedback.style.color = "var(--gemini)";
+        saveFeedback.textContent = "Configuration importée.";
+    } catch (err) {
+        saveFeedback.style.color = "var(--danger)";
+        saveFeedback.textContent = "Fichier XML invalide.";
+    } finally {
+        importFile.value = "";
+    }
+});
+
+// ---------- Initialisation ----------
+
+(function init() {
+    const cfg = loadConfig();
+    renderIncognitoPill(cfg);
+    startNewConversationFile();
+
+    if (!cfg.incognito) {
+        const history = loadHistory();
+        if (history.length > 0) {
+            removeEmptyState();
+            currentHistory = history;
+            history.forEach(entry => addMessage(entry));
+        }
+    }
+})();
+</script>
+</body>
+</html>
